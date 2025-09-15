@@ -11,7 +11,7 @@ echo Make sure the server is running if you want to test online features!
 echo.
 pause
 echo.
-C:/Users/Conrado/Desktop/FishGame/.venv/Scripts/python.exe scripts/unified_test.py
+python scripts/unified_test.py
 echo.
 echo Tests completed!
 pause

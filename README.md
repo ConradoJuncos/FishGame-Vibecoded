@@ -220,12 +220,39 @@ For easier startup, use the provided batch files:
 
 Simply double-click these files to run them.
 
+## 🚀 Quick Setup for New Users
+
+### Prerequisites
+- Python 3.8+ installed
+- Git (to clone repository)
+
+### Getting Started
+```bash
+# 1. Clone the repository
+git clone https://github.com/your-username/FishGame.git
+cd FishGame
+
+# 2. Install dependencies  
+pip install -r requirements.txt
+
+# 3. Run the game (Windows)
+start_server.bat      # Start server
+start_client.bat      # Start client
+
+# 3. Run the game (Linux/Mac)
+chmod +x *.sh         # Make executable (first time)
+./start_server.sh     # Start server
+./start_client.sh     # Start client
+```
+
+📖 **See [SETUP.md](SETUP.md) for detailed instructions**
+
 ## Testing the System
 
-1. **Run the server**: `start_server.bat` or manually with `python server.py`
+1. **Run the server**: `start_server.bat` or `python server.py`
 2. **Note the lobby code** displayed in the server console
-3. **Run the character window** (optional): `python scripts/simple_character.py` or `start_floating_character.bat`
-4. **Run the client**: `start_client.bat` or manually with `python client.py`
+3. **Run the character window** (optional): `start_floating_character.bat` or `python scripts/simple_character.py`
+4. **Run the client**: `start_client.bat` or `python client.py`
 5. **Connect** using the lobby code from step 2
 6. **Test commands**: `/chat Hello!`, `/fish` (start fishing), `/stop` (stop fishing), `/state`
 
@@ -341,22 +368,27 @@ FishGame/
 │   ├── idle_character.png        # Normal character sprite
 │   └── caught_character.png      # Excited character sprite
 ├── 📁 scripts/                   # All test and utility scripts
-│   ├── unified_test.py           # 🎯 Comprehensive test suite (recommended)
-│   ├── test_connection.py        # Connection and fishing mechanics test
-│   ├── test_fishing_probabilities.py  # Fish rarity distribution test
-│   ├── test_commands.py          # Automated command testing
+│   ├── unified_test.py           # 🎯 Comprehensive test suite
 │   ├── simple_character.py       # Floating character window (lightweight)
 │   ├── floating_character.py     # Advanced character window with features
-│   └── fishing_game_example.py   # Extended game logic example
+│   └── test_*.py                 # Various test utilities
 ├── 📄 server.py                  # Main game server
 ├── 📄 client.py                  # Main game client
 ├── 📄 requirements.txt           # Python dependencies
-├── 🚀 start_server.bat          # Launch server
-├── 🚀 start_client.bat          # Launch client  
-├── 🚀 start_floating_character.bat  # Simple character window
-├── 🚀 start_advanced_character.bat  # Advanced character window
-├── 🚀 run_tests.bat             # Run unified test suite
-└── 📖 README.md                 # This documentation
+├── 📖 SETUP.md                  # 🎯 Detailed setup guide
+├── � setup.bat / setup.sh       # First-time setup scripts
+├── �🚀 Windows launchers (.bat):
+│   ├── start_server.bat          # Launch server
+│   ├── start_client.bat          # Launch client
+│   ├── start_floating_character.bat  # Simple character window
+│   ├── start_advanced_character.bat  # Advanced character window
+│   └── run_tests.bat             # Run test suite
+├── 🚀 Unix launchers (.sh):
+│   ├── start_server.sh           # Launch server
+│   ├── start_client.sh           # Launch client
+│   ├── start_floating_character.sh   # Simple character window
+│   └── run_tests.sh              # Run test suite
+└── 📖 README.md                 # Main documentation
 ```
 
 **Quick Start Files:**
