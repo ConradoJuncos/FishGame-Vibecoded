@@ -41,14 +41,15 @@ class GameClient:
             
             self.websocket = await websockets.connect(uri)
             
-            # Send join lobby request
+            # Send join lobby request directly (before setting connected=True)
             join_message = {
                 "type": "join_lobby",
                 "lobby_code": lobby_code.strip().upper(),
                 "player_name": player_name.strip()
             }
             
-            await self.send_message(join_message)
+            logger.info("Sending join lobby request...")
+            await self.websocket.send(json.dumps(join_message))
             
             # Wait for response
             response_msg = await self.websocket.recv()
@@ -100,12 +101,17 @@ class GameClient:
     
     async def send_message(self, message: dict):
         """Send a JSON message to the server"""
-        if not self.websocket or not self.connected:
-            logger.warning("Cannot send message: not connected")
+        if not self.websocket:
+            logger.warning("Cannot send message: no websocket connection")
+            return False
+        
+        if not self.connected:
+            logger.warning("Cannot send message: not connected to server")
             return False
         
         try:
             await self.websocket.send(json.dumps(message))
+            logger.debug(f"Sent message: {message.get('type', 'unknown')}")
             return True
         except websockets.exceptions.ConnectionClosed:
             logger.warning("Connection closed while sending message")
@@ -113,6 +119,7 @@ class GameClient:
             return False
         except Exception as e:
             logger.error(f"Error sending message: {e}")
+            self.connected = False
             return False
     
     async def handle_message(self, message: dict):
@@ -170,30 +177,46 @@ class GameClient:
     async def listen_for_messages(self):
         """Listen for incoming messages from the server"""
         if not self.websocket:
+            logger.error("No websocket connection to listen on")
             return
             
         try:
-            async for message in self.websocket:
+            while self.connected and self.websocket:
                 try:
-                    data = json.loads(message)
-                    await self.handle_message(data)
-                except json.JSONDecodeError:
-                    logger.warning("Received invalid JSON from server")
+                    # Wait for message with timeout
+                    message = await asyncio.wait_for(self.websocket.recv(), timeout=1.0)
+                    try:
+                        data = json.loads(message)
+                        await self.handle_message(data)
+                    except json.JSONDecodeError:
+                        logger.warning("Received invalid JSON from server")
+                    except Exception as e:
+                        logger.error(f"Error handling message: {e}")
+                except asyncio.TimeoutError:
+                    # Timeout is normal, just continue listening
+                    continue
+                except websockets.exceptions.ConnectionClosed:
+                    logger.info("Server connection closed")
+                    self.connected = False
+                    break
                 except Exception as e:
-                    logger.error(f"Error handling message: {e}")
-        except websockets.exceptions.ConnectionClosed:
-            logger.info("Server connection closed")
-            self.connected = False
+                    logger.error(f"Error receiving message: {e}")
+                    break
         except Exception as e:
             logger.error(f"Error in message listener: {e}")
+        finally:
             self.connected = False
     
     async def ping_server(self):
         """Send periodic ping to keep connection alive"""
         while self.connected and self.running:
             await asyncio.sleep(30)  # Ping every 30 seconds
-            if self.connected:
-                await self.send_message({"type": "ping"})
+            if self.connected and self.websocket:
+                success = await self.send_message({"type": "ping"})
+                if not success:
+                    logger.warning("Failed to send ping, connection may be lost")
+                    self.connected = False
+                    break
     
     async def run(self):
         """Main client loop"""
@@ -202,6 +225,7 @@ class GameClient:
             return
         
         self.running = True
+        logger.info("Client is running. Type commands to interact...")
         
         # Start background tasks
         listen_task = asyncio.create_task(self.listen_for_messages())
@@ -217,10 +241,17 @@ class GameClient:
             # Cancel remaining tasks
             for task in pending:
                 task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                except Exception as e:
+                    logger.error(f"Error canceling task: {e}")
                 
         except Exception as e:
             logger.error(f"Error in client main loop: {e}")
         finally:
+            logger.info("Client loop ended")
             self.running = False
             self.connected = False
     
@@ -266,6 +297,7 @@ class InteractiveClient:
         self.client = GameClient()
         self.input_thread = None
         self.running = False
+        self.loop = None
     
     def setup_handlers(self):
         """Setup custom message handlers"""
@@ -302,20 +334,26 @@ class InteractiveClient:
                 
                 if command.startswith("/chat "):
                     message = command[6:]
-                    asyncio.run_coroutine_threadsafe(
-                        self.client.send_chat_message(message),
-                        asyncio.get_event_loop()
-                    )
+                    if self.client.connected and self.loop:
+                        asyncio.run_coroutine_threadsafe(
+                            self.client.send_chat_message(message),
+                            self.loop
+                        )
+                    else:
+                        print("Not connected to server!")
                 
                 elif command.startswith("/move "):
                     parts = command[6:].split()
                     if len(parts) >= 2:
                         try:
                             x, y = float(parts[0]), float(parts[1])
-                            asyncio.run_coroutine_threadsafe(
-                                self.client.move_player(x, y),
-                                asyncio.get_event_loop()
-                            )
+                            if self.client.connected and self.loop:
+                                asyncio.run_coroutine_threadsafe(
+                                    self.client.move_player(x, y),
+                                    self.loop
+                                )
+                            else:
+                                print("Not connected to server!")
                         except ValueError:
                             print("Invalid coordinates. Use: /move <x> <y>")
                     else:
@@ -326,27 +364,34 @@ class InteractiveClient:
                     if len(parts) >= 2:
                         try:
                             x, y = float(parts[0]), float(parts[1])
-                            asyncio.run_coroutine_threadsafe(
-                                self.client.cast_fishing_line(x, y),
-                                asyncio.get_event_loop()
-                            )
+                            if self.client.connected and self.loop:
+                                asyncio.run_coroutine_threadsafe(
+                                    self.client.cast_fishing_line(x, y),
+                                    self.loop
+                                )
+                            else:
+                                print("Not connected to server!")
                         except ValueError:
                             print("Invalid coordinates. Use: /cast <x> <y>")
                     else:
                         print("Usage: /cast <x> <y>")
                 
                 elif command == "/state":
-                    asyncio.run_coroutine_threadsafe(
-                        self.client.request_game_state(),
-                        asyncio.get_event_loop()
-                    )
+                    if self.client.connected and self.loop:
+                        asyncio.run_coroutine_threadsafe(
+                            self.client.request_game_state(),
+                            self.loop
+                        )
+                    else:
+                        print("Not connected to server!")
                 
                 elif command == "/quit":
                     self.running = False
-                    asyncio.run_coroutine_threadsafe(
-                        self.client.disconnect(),
-                        asyncio.get_event_loop()
-                    )
+                    if self.loop:
+                        asyncio.run_coroutine_threadsafe(
+                            self.client.disconnect(),
+                            self.loop
+                        )
                     break
                 
                 else:
@@ -377,6 +422,7 @@ class InteractiveClient:
         # Connect to server
         if await self.client.connect(server_host, server_port, lobby_code, player_name):
             self.running = True
+            self.loop = asyncio.get_running_loop()  # Store the current event loop
             
             # Start input handler thread
             self.input_thread = threading.Thread(target=self.input_handler, daemon=True)

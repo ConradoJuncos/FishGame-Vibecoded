@@ -246,4 +246,57 @@ This demonstrates how to build actual game features on top of the networking fou
 4. **Audio**: Sound effects, background music
 5. **Polish**: Menus, settings, save system
 
+## Troubleshooting
+
+### "Cannot send message: not connected" Error
+- **Fixed**: This was an issue with the initial connection handshake
+- **Solution**: Updated client to handle lobby joining properly before setting connected state
+
+### Client Commands Not Working  
+- **Issue**: Threading and asyncio event loop conflicts
+- **Solution**: Fixed event loop passing between main thread and input thread
+- **Test**: Use `test_commands.py` to verify commands work programmatically
+
+### Connection Test Scripts
+
+- **`test_connection.py`**: Interactive test that prompts for lobby code
+- **`test_commands.py`**: Automated test that verifies all client commands work
+
+Run these scripts to verify your setup is working correctly.
+
+## Floating Character Window
+
+A draggable, always-on-top character window that displays your fishing character image anywhere on your screen!
+
+### Features:
+- **Always on Top**: Stays visible over other windows
+- **Draggable**: Click and drag to move anywhere
+- **Lightweight**: Minimal resource usage
+- **Auto-resize**: Automatically fits your character image
+- **Right-click Options**: Toggle always-on-top, transparency, etc.
+
+### Usage:
+```bash
+# Simple floating character (recommended)
+python simple_character.py
+# OR double-click: start_floating_character.bat
+
+# Full-featured version with launcher
+python floating_character.py
+```
+
+### Controls:
+- **Left-click + drag**: Move the window
+- **Right-click**: Toggle always-on-top (simple version) / Options menu (full version)
+- **Double-click**: Close window (simple version)
+
+### Visual Features:
+- **Transparent Background**: Only your character image is visible, no white background
+- **No Borders**: Clean, borderless appearance
+- **Always on Top**: Stays visible over other applications
+
+Your `character.png` image will be displayed as a clean floating sprite that you can position anywhere on your screen!
+
+## Status: ✅ WORKING
+
 The networking foundation is complete and ready for your game logic!
