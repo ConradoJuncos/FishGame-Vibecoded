@@ -152,15 +152,19 @@ class GameClient:
             self.game_state = message.get("state", {})
             logger.debug("Received game state update")
         
-        elif message_type == "player_moved":
-            client_id = message.get("client_id")
-            position = message.get("position", {})
-            logger.debug(f"Player {client_id} moved to {position}")
+        elif message_type == "player_started_fishing":
+            player_name = message.get("player_name", "Unknown")
+            logger.info(f"🎣 {player_name} started fishing!")
         
-        elif message_type == "player_cast_line":
-            client_id = message.get("client_id")
-            cast_pos = message.get("cast_position", {})
-            logger.debug(f"Player {client_id} cast line at {cast_pos}")
+        elif message_type == "player_stopped_fishing":
+            player_name = message.get("player_name", "Unknown")
+            logger.info(f"🛑 {player_name} stopped fishing")
+        
+        elif message_type == "fish_caught":
+            player_name = message.get("player_name", "Unknown")
+            fish_type = message.get("fish_type", "unknown")
+            new_score = message.get("new_score", 0)
+            logger.info(f"🐟 {player_name} caught a fish '{fish_type}'! Score: {new_score}")
         
         elif message_type == "chat_message":
             player_name = message.get("player_name", "Unknown")
@@ -263,25 +267,21 @@ class GameClient:
             "text": text
         })
     
-    async def move_player(self, x: float, y: float) -> bool:
-        """Send player movement"""
+    async def start_fishing(self) -> bool:
+        """Start fishing"""
         return await self.send_message({
             "type": "player_action",
             "data": {
-                "action": "move",
-                "x": x,
-                "y": y
+                "action": "start_fishing"
             }
         })
     
-    async def cast_fishing_line(self, x: float, y: float) -> bool:
-        """Cast fishing line at specified position"""
+    async def stop_fishing(self) -> bool:
+        """Stop fishing"""
         return await self.send_message({
             "type": "player_action",
             "data": {
-                "action": "cast_line",
-                "x": x,
-                "y": y
+                "action": "stop_fishing"
             }
         })
     
@@ -304,14 +304,16 @@ class InteractiveClient:
         def on_game_state(message):
             state = message.get("state", {})
             players = state.get("players", {})
-            print(f"\n--- Game State ---")
+            print(f"\n--- 🎣 Fishing Game State ---")
             print(f"Players online: {len(players)}")
             for client_id, player_data in players.items():
                 name = player_data.get("name", "Unknown")
-                pos = player_data.get("position", {})
                 score = player_data.get("score", 0)
-                print(f"  {name} (ID: {client_id}): Score {score}, Position ({pos.get('x', 0)}, {pos.get('y', 0)})")
-            print("------------------\n")
+                is_fishing = player_data.get("is_fishing", False)
+                fish_caught = player_data.get("fish_caught", [])
+                fishing_status = "🎣 FISHING" if is_fishing else "⏸️ Not fishing"
+                print(f"  {name}: {fishing_status} | Score: {score} | Fish: {fish_caught}")
+            print("----------------------------\n")
         
         self.client.add_message_handler("game_state", on_game_state)
     
@@ -320,8 +322,8 @@ class InteractiveClient:
         print("\n=== Fishing Game Client ===")
         print("Commands:")
         print("  /chat <message>  - Send chat message")
-        print("  /move <x> <y>    - Move player to position")
-        print("  /cast <x> <y>    - Cast fishing line")
+        print("  /fish            - Start fishing")
+        print("  /stop            - Stop fishing")
         print("  /state           - Request game state")
         print("  /quit            - Disconnect and quit")
         print("============================\n")
@@ -342,39 +344,23 @@ class InteractiveClient:
                     else:
                         print("Not connected to server!")
                 
-                elif command.startswith("/move "):
-                    parts = command[6:].split()
-                    if len(parts) >= 2:
-                        try:
-                            x, y = float(parts[0]), float(parts[1])
-                            if self.client.connected and self.loop:
-                                asyncio.run_coroutine_threadsafe(
-                                    self.client.move_player(x, y),
-                                    self.loop
-                                )
-                            else:
-                                print("Not connected to server!")
-                        except ValueError:
-                            print("Invalid coordinates. Use: /move <x> <y>")
+                elif command == "/fish":
+                    if self.client.connected and self.loop:
+                        asyncio.run_coroutine_threadsafe(
+                            self.client.start_fishing(),
+                            self.loop
+                        )
                     else:
-                        print("Usage: /move <x> <y>")
+                        print("Not connected to server!")
                 
-                elif command.startswith("/cast "):
-                    parts = command[6:].split()
-                    if len(parts) >= 2:
-                        try:
-                            x, y = float(parts[0]), float(parts[1])
-                            if self.client.connected and self.loop:
-                                asyncio.run_coroutine_threadsafe(
-                                    self.client.cast_fishing_line(x, y),
-                                    self.loop
-                                )
-                            else:
-                                print("Not connected to server!")
-                        except ValueError:
-                            print("Invalid coordinates. Use: /cast <x> <y>")
+                elif command == "/stop":
+                    if self.client.connected and self.loop:
+                        asyncio.run_coroutine_threadsafe(
+                            self.client.stop_fishing(),
+                            self.loop
+                        )
                     else:
-                        print("Usage: /cast <x> <y>")
+                        print("Not connected to server!")
                 
                 elif command == "/state":
                     if self.client.connected and self.loop:

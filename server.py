@@ -63,6 +63,11 @@ class GameServer:
             "players": {},
             "game_started": False
         }
+        
+        # Fishing system
+        self.fish_types = ["a", "b", "c", "d", "e", "f", "g"]
+        self.fish_probabilities = [0.40, 0.20, 0.15, 0.10, 0.08, 0.05, 0.02]  # a=40%, b=20%, etc.
+        self.fishing_players = {}  # Track who is fishing
     
     def _generate_lobby_code(self) -> str:
         """Generate a random 6-character lobby code"""
@@ -98,7 +103,8 @@ class GameServer:
             self.game_state["players"][client_id] = {
                 "name": player_name,
                 "score": 0,
-                "position": {"x": 0, "y": 0},
+                "fish_caught": [],
+                "is_fishing": False,
                 "connected_at": time.time()
             }
             
@@ -233,39 +239,89 @@ class GameServer:
             })
     
     async def handle_player_action(self, websocket: Any, client_id: str, action_data: dict):
-        """Handle player game actions (to be extended with game logic)"""
+        """Handle player game actions - now focused on fishing!"""
         action_type = action_data.get("action", "")
         
-        if action_type == "move":
-            # Update player position
-            new_x = action_data.get("x", 0)
-            new_y = action_data.get("y", 0)
-            
-            # Basic bounds checking (extend as needed)
-            new_x = max(0, min(800, new_x))  # Assuming 800px width
-            new_y = max(0, min(600, new_y))  # Assuming 600px height
-            
-            self.game_state["players"][client_id]["position"] = {"x": new_x, "y": new_y}
-            
-            # Broadcast position update
-            await self.broadcast_message({
-                "type": "player_moved",
-                "client_id": client_id,
-                "position": {"x": new_x, "y": new_y}
-            })
+        if action_type == "start_fishing":
+            # Start fishing for this player
+            if not self.game_state["players"][client_id]["is_fishing"]:
+                self.game_state["players"][client_id]["is_fishing"] = True
+                self.fishing_players[client_id] = time.time()
+                
+                await self.broadcast_message({
+                    "type": "player_started_fishing",
+                    "client_id": client_id,
+                    "player_name": self.game_state["players"][client_id]["name"]
+                })
+                
+                logger.info(f"Player {client_id} started fishing")
         
-        elif action_type == "cast_line":
-            # Handle fishing action
-            cast_x = action_data.get("x", 0)
-            cast_y = action_data.get("y", 0)
-            
-            await self.broadcast_message({
-                "type": "player_cast_line",
-                "client_id": client_id,
-                "cast_position": {"x": cast_x, "y": cast_y}
-            })
+        elif action_type == "stop_fishing":
+            # Stop fishing for this player
+            if self.game_state["players"][client_id]["is_fishing"]:
+                self.game_state["players"][client_id]["is_fishing"] = False
+                if client_id in self.fishing_players:
+                    del self.fishing_players[client_id]
+                
+                await self.broadcast_message({
+                    "type": "player_stopped_fishing",
+                    "client_id": client_id,
+                    "player_name": self.game_state["players"][client_id]["name"]
+                })
+                
+                logger.info(f"Player {client_id} stopped fishing")
+    
+    def get_random_fish(self):
+        """Get a random fish based on probability distribution"""
+        import random
+        rand = random.random()
+        cumulative = 0
         
-        # Add more game actions as needed
+        for i, prob in enumerate(self.fish_probabilities):
+            cumulative += prob
+            if rand <= cumulative:
+                return self.fish_types[i]
+        
+        return self.fish_types[0]  # Fallback to 'a'
+    
+    async def process_fishing(self):
+        """Process fishing attempts for all fishing players"""
+        import random
+        current_time = time.time()
+        
+        for client_id in list(self.fishing_players.keys()):
+            if client_id not in self.game_state["players"]:
+                # Player disconnected
+                del self.fishing_players[client_id]
+                continue
+            
+            last_attempt = self.fishing_players[client_id]
+            
+            # Check if 1 second has passed since last attempt
+            if current_time - last_attempt >= 1.0:
+                self.fishing_players[client_id] = current_time
+                
+                # 5% chance to catch a fish
+                if random.random() <= 0.05:
+                    # Caught a fish!
+                    fish_type = self.get_random_fish()
+                    player_name = self.game_state["players"][client_id]["name"]
+                    
+                    # Add to player's caught fish
+                    self.game_state["players"][client_id]["fish_caught"].append(fish_type)
+                    self.game_state["players"][client_id]["score"] += 1
+                    
+                    # Broadcast the catch
+                    await self.broadcast_message({
+                        "type": "fish_caught",
+                        "client_id": client_id,
+                        "player_name": player_name,
+                        "fish_type": fish_type,
+                        "new_score": self.game_state["players"][client_id]["score"],
+                        "total_fish": len(self.game_state["players"][client_id]["fish_caught"])
+                    })
+                    
+                    logger.info(f"Player {client_id} caught fish '{fish_type}'")
     
     async def handle_client(self, websocket: Any, path: str = ""):
         """Handle a client connection"""
@@ -309,14 +365,28 @@ class GameServer:
         finally:
             await self.unregister_client(websocket)
     
+    async def fishing_loop(self):
+        """Background task to process fishing attempts"""
+        while True:
+            try:
+                await self.process_fishing()
+                await asyncio.sleep(0.1)  # Check every 100ms
+            except Exception as e:
+                logger.error(f"Error in fishing loop: {e}")
+                await asyncio.sleep(1)
+    
     async def start_server(self):
         """Start the WebSocket server"""
         logger.info(f"Starting Fishing Game Server...")
         logger.info(f"Lobby Code: {self.lobby_code}")
         logger.info(f"Server will run on {self.host}:{self.port}")
         
+        # Start fishing background task
+        fishing_task = asyncio.create_task(self.fishing_loop())
+        
         async with websockets.serve(self.handle_client, self.host, self.port):
             logger.info("Server is running! Waiting for players...")
+            logger.info("🎣 Fishing system active - 5% catch chance every second!")
             await asyncio.Future()  # Run forever
 
 # Main execution

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Test Connection Script
-Simple automated test to verify client-server connection works.
+Simple automated test to verify client-server connection and fishing functionality.
 """
 
 import asyncio
@@ -9,10 +9,81 @@ import websockets
 import json
 import logging
 import time
+import random
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Fish rarity configuration
+FISH_TYPES = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
+FISH_PROBABILITIES = [0.4, 0.2, 0.15, 0.12, 0.08, 0.03, 0.02]  # Probabilities that sum to 1.0
+
+def catch_fish():
+    """Generate a random fish based on rarity probabilities"""
+    return random.choices(FISH_TYPES, weights=FISH_PROBABILITIES)[0]
+
+def trigger_excitement():
+    """Trigger the excitement mark (!) - placeholder for character window integration"""
+    print("🎣 FISH CAUGHT! (!) - Character should show excitement mark!")
+    
+    # Try to trigger excitement in character window via simple file signal
+    # This is a simple inter-process communication method
+    try:
+        with open("fish_caught_signal.tmp", "w") as f:
+            f.write(str(time.time()))
+    except:
+        pass  # Ignore if file can't be written
+
+async def fishing_loop(websocket, fishing_duration=10):
+    """
+    Fishing loop that checks every second for fish catch (5% chance)
+    
+    Args:
+        websocket: The websocket connection
+        fishing_duration: How long to fish in seconds
+    """
+    print(f"🎣 Starting fishing for {fishing_duration} seconds...")
+    
+    # Send start fishing message
+    start_fishing_msg = {
+        "type": "player_action",
+        "data": {
+            "action": "start_fishing"
+        }
+    }
+    await websocket.send(json.dumps(start_fishing_msg))
+    
+    for second in range(fishing_duration):
+        await asyncio.sleep(1)  # Wait 1 second
+        
+        # 5% chance to catch a fish each second
+        if random.random() < 0.05:
+            caught_fish = catch_fish()
+            print(f"🐟 Fish caught: {caught_fish}")
+            trigger_excitement()
+            
+            # Optionally send fish catch to server (if server supports it)
+            fish_catch_msg = {
+                "type": "player_action", 
+                "data": {
+                    "action": "fish_caught",
+                    "fish_type": caught_fish
+                }
+            }
+            await websocket.send(json.dumps(fish_catch_msg))
+        else:
+            print(f"⏰ Fishing... ({second + 1}s) - No fish yet")
+    
+    # Send stop fishing message
+    stop_fishing_msg = {
+        "type": "player_action",
+        "data": {
+            "action": "stop_fishing"
+        }
+    }
+    await websocket.send(json.dumps(stop_fishing_msg))
+    print("🎣 Fishing session ended.")
 
 async def test_connection():
     """Test the client-server connection"""
@@ -57,37 +128,17 @@ async def test_connection():
             print("Testing chat message...")
             chat_msg = {
                 "type": "chat_message",
-                "text": "Hello from test script!"
+                "text": "Hello from fishing test script!"
             }
             await websocket.send(json.dumps(chat_msg))
             
-            # Test player movement
-            print("Testing player movement...")
-            move_msg = {
-                "type": "player_action",
-                "data": {
-                    "action": "move",
-                    "x": 100,
-                    "y": 200
-                }
-            }
-            await websocket.send(json.dumps(move_msg))
+            # Start fishing loop (10 seconds of fishing)
+            print("Starting fishing test...")
+            await fishing_loop(websocket, fishing_duration=10)
             
-            # Test fishing cast
-            print("Testing fishing cast...")
-            cast_msg = {
-                "type": "player_action",
-                "data": {
-                    "action": "cast_line",
-                    "x": 150,
-                    "y": 250
-                }
-            }
-            await websocket.send(json.dumps(cast_msg))
-            
-            # Listen for a few messages
+            # Listen for server messages
             print("Listening for server messages...")
-            for i in range(3):
+            for i in range(5):
                 try:
                     message = await asyncio.wait_for(websocket.recv(), timeout=2.0)
                     data = json.loads(message)
@@ -96,7 +147,7 @@ async def test_connection():
                     print("No message received (timeout)")
                     break
             
-            print("✅ Connection test completed successfully!")
+            print("✅ Fishing test completed successfully!")
             
         elif response.get("type") == "error":
             print(f"❌ Server error: {response.get('message')}")

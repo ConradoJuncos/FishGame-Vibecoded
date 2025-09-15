@@ -44,11 +44,24 @@ class FloatingCharacter:
     def setup_image(self):
         """Load and display the character image"""
         try:
-            # Get the path to the image
-            image_path = os.path.join(os.path.dirname(__file__), "images", "character.png")
+            # Get the path to the image - try multiple possible locations
+            base_path = os.path.dirname(os.path.dirname(__file__))
             
-            if not os.path.exists(image_path):
-                raise FileNotFoundError(f"Character image not found at: {image_path}")
+            # Try different image paths in order of preference
+            possible_paths = [
+                os.path.join(base_path, "images", "idle_character.png"),           # Main character
+                os.path.join(base_path, "images", "base_models", "character.png"), # Fallback in base_models
+                os.path.join(base_path, "images", "character.png")                 # Legacy fallback
+            ]
+            
+            image_path = None
+            for path in possible_paths:
+                if os.path.exists(path):
+                    image_path = path
+                    break
+            
+            if image_path is None:
+                raise FileNotFoundError(f"Character image not found in any of the expected locations: {possible_paths}")
             
             # Load image with PIL
             pil_image = Image.open(image_path)
@@ -112,13 +125,23 @@ class FloatingCharacter:
         self.drag_data["y"] = event.y
     
     def on_drag(self, event):
-        """Handle window dragging"""
+        """Handle window dragging with screen boundary constraints"""
         # Calculate new position
-        x = self.root.winfo_x() + (event.x - self.drag_data["x"])
-        y = self.root.winfo_y() + (event.y - self.drag_data["y"])
+        new_x = self.root.winfo_x() + (event.x - self.drag_data["x"])
+        new_y = self.root.winfo_y() + (event.y - self.drag_data["y"])
+        
+        # Get screen and window dimensions
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        window_width = self.root.winfo_width()
+        window_height = self.root.winfo_height()
+        
+        # Constrain to screen boundaries
+        new_x = max(0, min(new_x, screen_width - window_width))
+        new_y = max(0, min(new_y, screen_height - window_height))
         
         # Move window
-        self.root.geometry(f"+{x}+{y}")
+        self.root.geometry(f"+{new_x}+{new_y}")
     
     def stop_drag(self, event):
         """Stop dragging"""

@@ -17,7 +17,7 @@ async def test_commands():
     success = await client.connect(
         server_host="localhost",
         server_port=8765,
-        lobby_code="613MJO",  # Current lobby code
+        lobby_code="82HMOF",  # Current lobby code
         player_name="TestCommands"
     )
     
@@ -31,17 +31,20 @@ async def test_commands():
     print("Testing chat message...")
     await client.send_chat_message("Hello from test!")
     
-    print("Testing player movement...")  
-    await client.move_player(100.0, 200.0)
+    print("Testing start fishing...")  
+    await client.start_fishing()
     
-    print("Testing fishing cast...")
-    await client.cast_fishing_line(150.0, 250.0)
+    print("Waiting 10 seconds to see if we catch any fish...")
+    await asyncio.sleep(10)
     
     print("Testing game state request...")
     await client.request_game_state()
     
+    print("Testing stop fishing...")
+    await client.stop_fishing()
+    
     # Wait a moment to see responses
-    await asyncio.sleep(3)
+    await asyncio.sleep(2)
     
     print("✅ All commands sent successfully!")
     await client.disconnect()

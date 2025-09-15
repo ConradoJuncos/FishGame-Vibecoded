@@ -222,11 +222,45 @@ Simply double-click these files to run them.
 
 ## Testing the System
 
-1. **Run the server**: `start_server.bat` or manually with the Python command
+1. **Run the server**: `start_server.bat` or manually with `python server.py`
 2. **Note the lobby code** displayed in the server console
-3. **Run the client**: `start_server.bat` or manually 
-4. **Connect** using the lobby code from step 2
-5. **Test commands** like `/chat Hello!`, `/move 100 200`, `/cast 150 300`
+3. **Run the character window** (optional): `python scripts/simple_character.py` or `start_floating_character.bat`
+4. **Run the client**: `start_client.bat` or manually with `python client.py`
+5. **Connect** using the lobby code from step 2
+6. **Test commands**: `/chat Hello!`, `/fish` (start fishing), `/stop` (stop fishing), `/state`
+
+### Fishing Mechanics
+
+The game now includes a realistic fishing system:
+
+**Fish Types & Rarity**:
+- `a`: 40% chance (most common)
+- `b`: 20% chance
+- `c`: 15% chance
+- `d`: 12% chance
+- `e`: 8% chance
+- `f`: 3% chance
+- `g`: 2% chance (rarest/legendary)
+
+**Fishing Process**:
+- Use `/fish` command to start fishing
+- Every second: 5% chance to catch a fish
+- When caught, fish rarity is determined by above probabilities
+- Character window changes from `idle_character.png` to `caught_character.png` when fish are caught
+- Character reverts to normal image after 2 seconds
+- Use `/stop` to stop fishing
+
+**Test Scripts**:
+```bash
+# Unified comprehensive test suite (recommended)
+python scripts/unified_test.py
+# OR use: run_tests.bat
+
+# Individual test scripts:
+python scripts/test_connection.py           # Connection and fishing mechanics
+python scripts/test_fishing_probabilities.py  # Fish rarity distribution
+python scripts/test_commands.py             # Automated command testing
+```
 
 ## Example with Game Logic
 
@@ -286,7 +320,7 @@ python floating_character.py
 ```
 
 ### Controls:
-- **Left-click + drag**: Move the window
+- **Left-click + drag**: Move the window (automatically constrained to screen boundaries)
 - **Right-click**: Toggle always-on-top (simple version) / Options menu (full version)
 - **Double-click**: Close window (simple version)
 
@@ -294,8 +328,43 @@ python floating_character.py
 - **Transparent Background**: Only your character image is visible, no white background
 - **No Borders**: Clean, borderless appearance
 - **Always on Top**: Stays visible over other applications
+- **Screen Boundary Protection**: Window cannot be dragged off-screen
+- **Dynamic Image Switching**: Changes from `idle_character.png` to `caught_character.png` when fish are caught
 
-Your `character.png` image will be displayed as a clean floating sprite that you can position anywhere on your screen!
+Your character images will be displayed as clean floating sprites that you can position anywhere on your screen!
+
+## Project Structure
+
+```
+FishGame/
+├── 📁 images/                    # Game assets
+│   ├── idle_character.png        # Normal character sprite
+│   └── caught_character.png      # Excited character sprite
+├── 📁 scripts/                   # All test and utility scripts
+│   ├── unified_test.py           # 🎯 Comprehensive test suite (recommended)
+│   ├── test_connection.py        # Connection and fishing mechanics test
+│   ├── test_fishing_probabilities.py  # Fish rarity distribution test
+│   ├── test_commands.py          # Automated command testing
+│   ├── simple_character.py       # Floating character window (lightweight)
+│   ├── floating_character.py     # Advanced character window with features
+│   └── fishing_game_example.py   # Extended game logic example
+├── 📄 server.py                  # Main game server
+├── 📄 client.py                  # Main game client
+├── 📄 requirements.txt           # Python dependencies
+├── 🚀 start_server.bat          # Launch server
+├── 🚀 start_client.bat          # Launch client  
+├── 🚀 start_floating_character.bat  # Simple character window
+├── 🚀 start_advanced_character.bat  # Advanced character window
+├── 🚀 run_tests.bat             # Run unified test suite
+└── 📖 README.md                 # This documentation
+```
+
+**Quick Start Files:**
+- **🎯 `run_tests.bat`**: Run comprehensive tests (recommended first step)
+- **🚀 `start_server.bat`**: Launch the game server
+- **🚀 `start_client.bat`**: Connect to the game
+- **🚀 `start_floating_character.bat`**: Simple character window (fish catching, image switching)
+- **🚀 `start_advanced_character.bat`**: Advanced character window (with options menu)
 
 ## Status: ✅ WORKING
 
